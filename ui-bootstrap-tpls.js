@@ -2804,7 +2804,6 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
             function prepTriggers() {
               var val = attrs[ prefix + 'Trigger' ];
               unregisterTriggers();
-
               triggers = getTriggers( val );
               $document[0].addEventListener('click', bodyHideTooltipBind);
               if ( triggers.show === triggers.hide ) {
