@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 0.12.3 - 2015-07-04
+ * Version: 0.12.0 - 2014-11-16
  * License: MIT
  */
 angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.transition","ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.bindHtml","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.dropdown","ui.bootstrap.modal","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
@@ -1628,13 +1628,13 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
   };
 });
 
-angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
+angular.module('ui.bootstrap.dropdown', [])
 
 .constant('dropdownConfig', {
   openClass: 'open'
 })
 
-.service('dropdownService', ['$document', '$rootScope', function($document, $rootScope) {
+.service('dropdownService', ['$document', function($document) {
   var openScope = null;
 
   this.open = function( dropdownScope ) {
@@ -1663,23 +1663,20 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     // unbound this event handler. So check openScope before proceeding.
     if (!openScope) { return; }
 
-    if( evt && openScope.getAutoClose() === 'disabled' )  { return ; }
-
     var toggleElement = openScope.getToggleElement();
+    var dropdownElement = openScope.getDropdownElement();
+
+    if ( dropdownElement.hasAttribute('prevent-close-on-click') && dropdownElement.contains(evt.target) ) {
+        return;
+    }
+
     if ( evt && toggleElement && toggleElement[0].contains(evt.target) ) {
         return;
     }
 
-    var $element = openScope.getElement();
-    if( evt && openScope.getAutoClose() === 'outsideClick' && $element && $element[0].contains(evt.target) ) {
-      return;
-    }
-
-    openScope.isOpen = false;
-
-    if (!$rootScope.$$phase) {
-      openScope.$apply();
-    }
+    openScope.$apply(function() {
+      openScope.isOpen = false;
+    });
   };
 
   var escapeKeyBind = function( evt ) {
@@ -1690,15 +1687,13 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   };
 }])
 
-.controller('DropdownController', ['$scope', '$attrs', '$parse', 'dropdownConfig', 'dropdownService', '$animate', '$position', '$document', '$compile', '$templateRequest', function($scope, $attrs, $parse, dropdownConfig, dropdownService, $animate, $position, $document, $compile, $templateRequest) {
+.controller('DropdownController', ['$scope', '$attrs', '$parse', 'dropdownConfig', 'dropdownService', '$animate', function($scope, $attrs, $parse, dropdownConfig, dropdownService, $animate) {
   var self = this,
       scope = $scope.$new(), // create a child scope so we are not polluting original one
-      templateScope,
       openClass = dropdownConfig.openClass,
       getIsOpen,
       setIsOpen = angular.noop,
-      toggleInvoker = $attrs.onToggle ? $parse($attrs.onToggle) : angular.noop,
-      appendToBody = false;
+      toggleInvoker = $attrs.onToggle ? $parse($attrs.onToggle) : angular.noop;
 
   this.init = function( element ) {
     self.$element = element;
@@ -1709,15 +1704,6 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
 
       $scope.$watch(getIsOpen, function(value) {
         scope.isOpen = !!value;
-      });
-    }
-
-    appendToBody = angular.isDefined($attrs.dropdownAppendToBody);
-
-    if ( appendToBody && self.dropdownMenu ) {
-      $document.find('body').append( self.dropdownMenu );
-      element.on('$destroy', function handleDestroyEvent() {
-        self.dropdownMenu.remove();
       });
     }
   };
@@ -1734,13 +1720,9 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   scope.getToggleElement = function() {
     return self.toggleElement;
   };
-
-  scope.getAutoClose = function() {
-    return $attrs.autoClose || 'always'; //or 'outsideClick' or 'disabled'
-  };
-
-  scope.getElement = function() {
-    return self.$element;
+  
+  scope.getDropdownElement = function() {
+    return self.$element[0].getElementsByClassName('dropdown-menu')[0];
   };
 
   scope.focusToggleElement = function() {
@@ -1750,41 +1732,12 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   };
 
   scope.$watch('isOpen', function( isOpen, wasOpen ) {
-    if ( appendToBody && self.dropdownMenu ) {
-      var pos = $position.positionElements(self.$element, self.dropdownMenu, 'bottom-left', true);
-      self.dropdownMenu.css({
-        top: pos.top + 'px',
-        left: pos.left + 'px',
-        display: isOpen ? 'block' : 'none'
-      });
-    }
-
     $animate[isOpen ? 'addClass' : 'removeClass'](self.$element, openClass);
 
     if ( isOpen ) {
-      if (self.dropdownMenuTemplateUrl) {
-        $templateRequest(self.dropdownMenuTemplateUrl).then(function(tplContent) {
-          templateScope = scope.$new();
-          $compile(tplContent.trim())(templateScope, function(dropdownElement) {
-            var newEl = dropdownElement;
-            self.dropdownMenu.replaceWith(newEl);
-            self.dropdownMenu = newEl;
-          });
-        });
-      }
-
       scope.focusToggleElement();
       dropdownService.open( scope );
     } else {
-      if (self.dropdownMenuTemplateUrl) {
-        if (templateScope) {
-          templateScope.$destroy();
-        }
-        var newEl = angular.element('<ul class="dropdown-menu"></ul>');
-        self.dropdownMenu.replaceWith(newEl);
-        self.dropdownMenu = newEl;
-      }
-
       dropdownService.close( scope );
     }
 
@@ -1795,9 +1748,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   });
 
   $scope.$on('$locationChangeSuccess', function() {
-    if (scope.getAutoClose() !== 'disabled') {
-      scope.isOpen = false;
-    }
+    scope.isOpen = false;
   });
 
   $scope.$on('$destroy', function() {
@@ -1810,25 +1761,6 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     controller: 'DropdownController',
     link: function(scope, element, attrs, dropdownCtrl) {
       dropdownCtrl.init( element );
-    }
-  };
-})
-
-.directive('dropdownMenu', function() {
-  return {
-    restrict: 'AC',
-    require: '?^dropdown',
-    link: function(scope, element, attrs, dropdownCtrl) {
-      if (!dropdownCtrl) {
-        return;
-      }
-      var tplUrl = attrs.templateUrl;
-      if (tplUrl) {
-        dropdownCtrl.dropdownMenuTemplateUrl = tplUrl;
-      }
-      if (!dropdownCtrl.dropdownMenu) {
-        dropdownCtrl.dropdownMenu = element;
-      }
     }
   };
 })
@@ -2138,13 +2070,9 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
         body.addClass(OPENED_MODAL_CLASS);
       };
 
-      function broadcastClosing(modalWindow, resultOrReason, closing) {
-          return !modalWindow.value.modalScope.$broadcast('modal.closing', resultOrReason, closing).defaultPrevented;
-      }
-
       $modalStack.close = function (modalInstance, result) {
         var modalWindow = openedWindows.get(modalInstance);
-        if (modalWindow && broadcastClosing(modalWindow, result, true)) {
+        if (modalWindow) {
           modalWindow.value.deferred.resolve(result);
           removeModalWindow(modalInstance);
         }
@@ -2152,7 +2080,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
 
       $modalStack.dismiss = function (modalInstance, reason) {
         var modalWindow = openedWindows.get(modalInstance);
-        if (modalWindow && broadcastClosing(modalWindow, reason, true)) {
+        if (modalWindow) {
           modalWindow.value.deferred.reject(reason);
           removeModalWindow(modalInstance);
         }
@@ -2694,7 +2622,14 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 
               // Set the initial positioning.
               tooltip.css({ top: 0, left: 0, display: 'block' });
-              ttScope.$digest();
+
+              // Now we add it to the DOM because need some info about it. But it's not
+              // visible yet anyway.
+              if ( appendToBody ) {
+                  $document.find( 'body' ).append( tooltip );
+              } else {
+                element.after( tooltip );
+              }
 
               positionTooltip();
 
@@ -2734,13 +2669,7 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
                 removeTooltip();
               }
               tooltipLinkedScope = ttScope.$new();
-              tooltip = tooltipLinker(tooltipLinkedScope, function (tooltip) {
-                if ( appendToBody ) {
-                  $document.find( 'body' ).append( tooltip );
-                } else {
-                  element.after( tooltip );
-                }
-              });
+              tooltip = tooltipLinker(tooltipLinkedScope, angular.noop);
             }
 
             function removeTooltip() {
@@ -2790,23 +2719,13 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
               element.unbind(triggers.show, showTooltipBind);
               element.unbind(triggers.hide, hideTooltipBind);
             };
-            /**/ // hide tooltips/popovers for outsideClick trigger
-            function bodyHideTooltipBind(e) {
-              if (!ttScope || !ttScope.isOpen || !tooltip) {
-                return;
-              }
-              // make sure the tooltip/popover link or tool tooltip/popover itself were not clicked
-              if (!element[0].contains(e.target) && !tooltip[0].contains(e.target)) {
-                hideTooltipBind();
-              }
-            }
-            
+
             function prepTriggers() {
               var val = attrs[ prefix + 'Trigger' ];
               unregisterTriggers();
 
               triggers = getTriggers( val );
-              $document[0].addEventListener('click', bodyHideTooltipBind);
+
               if ( triggers.show === triggers.hide ) {
                 element.bind( triggers.show, toggleTooltipBind );
               } else {
@@ -3767,7 +3686,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
       //we need to propagate user's query so we can higlight matches
       scope.query = undefined;
 
-      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
+      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later 
       var timeoutPromise;
 
       var scheduleSearchWithTimeout = function(inputValue) {
